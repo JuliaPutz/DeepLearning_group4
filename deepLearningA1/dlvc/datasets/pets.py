@@ -49,8 +49,9 @@ class PetsDataset(ClassificationDataset):
             idx = np.where((labels_np == cat_label) | (labels_np == dog_label))
 
             reshaped = data[idx].reshape(len(data[idx]),3,32,32).transpose(0,2,3,1).astype("uint8") # image are brought into the (32,32,3) shape
+            bgr = reshaped[..., ::-1] # convert images from initial rgb to bgr
             renamed = (labels_np[idx]==dog_label).astype(int)   # dog is 1, cat is 0
-            return reshaped, renamed
+            return bgr, renamed
 
 
         # referring to subsets via their number is allowed, as a treat
