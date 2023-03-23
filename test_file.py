@@ -2,6 +2,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 fdir = r"cifar\\"
+cat_label = 3
+dog_label = 5
+
+#check label names/classes
+#batch_meta = unpickle(fdir + 'batches.meta')
+#print(batch_meta)
 
 # function to unpack datasets
 def unpickle(file):
@@ -10,38 +16,38 @@ def unpickle(file):
         dict = pickle.load(fo, encoding='bytes')
     return dict
 
+# filter out cat and dog images
+def filter_reshape(batch):
+    data = batch[b'data']
+    labels = batch[b'labels']
+
+    labels_np = np.array(labels)
+    idx = np.where((labels_np == cat_label) | (labels_np == dog_label))
+
+    reshaped = data[idx].reshape(len(data[idx]),3,32,32)
+    return(reshaped.transpose(0,2,3,1).astype("uint8"))
+
 #### TEST ####
+print('----------TEST-------------')
 batch = unpickle(fdir + 'test_batch')
 
-print(batch.keys())
-data = batch[b'data']
+test_data = filter_reshape(batch)
 
-print(len(data))
-
-reshaped = data.reshape(len(data),3,32,32)
-tr = reshaped.transpose(0,2,3,1).astype("uint8")
-
-plt.imshow(tr[9999].astype("uint8"))
+print(test_data.shape)
+print(type(test_data))
+print(len(test_data))
+plt.imshow(test_data[0].astype("uint8"))
 plt.show()
 
-print(tr.shape)
-print(type(tr))
 
 #### VALIDATION ####
 print('--------validation-------------')
-fdir = r"E:\\TU\\deepLearning\\A1\\cifar\\"
 batch_val = unpickle(fdir + 'data_batch_5')
 
-print(batch.keys())
-data_val = batch_val[b'data']
+val_data = filter_reshape(batch_val)
 
-print(len(data_val))
-
-reshaped_val = data_val.reshape(len(data_val),3,32,32)
-tr_val = reshaped_val.transpose(0,2,3,1).astype("uint8")
-
-plt.imshow(tr_val[2].astype("uint8"))
+print(val_data.shape)
+print(type(val_data))
+print(len(val_data))
+plt.imshow(val_data[2].astype("uint8"))
 plt.show()
-
-print(tr_val.shape)
-print(type(tr_val))
