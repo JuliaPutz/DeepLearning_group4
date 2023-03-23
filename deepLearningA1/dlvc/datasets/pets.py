@@ -1,5 +1,6 @@
 
 from ..dataset import Sample, Subset, ClassificationDataset
+import numpy as np
 
 class PetsDataset(ClassificationDataset):
     '''
@@ -22,6 +23,14 @@ class PetsDataset(ClassificationDataset):
         '''
 
         # TODO implement
+        #######################################
+        # check channel order
+        # load train data and stack together
+        # len function
+        # getitem function
+        # num classes
+        #######################################
+
         # See the CIFAR-10 website on how to load the data files
         def unpickle(file):
             import pickle
@@ -50,11 +59,11 @@ class PetsDataset(ClassificationDataset):
             #validation
             elif subset == Subset.VALIDATION:
                 batch_val = unpickle(fdir + 'data_batch_5')
-                val_data = filter_reshape(batch_val)
+                self.data = filter_reshape(batch_val)
             #test
             elif subset == Subset.TEST:
                 batch_test = unpickle(fdir + 'test_batch')
-                test_data = filter(batch_test)
+                self.data = filter_reshape(batch_test)
         except ValueError:
             raise ValueError('fdir is not a Directory or file is missing')
         #pass
