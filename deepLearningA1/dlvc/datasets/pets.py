@@ -48,50 +48,71 @@ class PetsDataset(ClassificationDataset):
             labels_np = np.array(labels)
             idx = np.where((labels_np == cat_label) | (labels_np == dog_label))
 
-            reshaped = data[idx].reshape(len(data[idx]),3,32,32)
-            return(reshaped.transpose(0,2,3,1).astype("uint8"))
+            reshaped = data[idx].reshape(len(data[idx]),3,32,32).transpose(0,2,3,1).astype("uint8") # image are brought into the (32,32,3) shape
+            renamed = (labels_np[idx]==dog_label).astype(int)   # dog is 1, cat is 0
+            return reshaped, renamed
+
+
+        # referring to subsets via their number is allowed, as a treat
+        if not isinstance(subset, Subset):
+            self.subset = Subset(subset)
+        else:
+            self.subset = subset
+        self.num_classes = 2
+        self.data = None
+        self.labels = None
+
+        if fdir[-1] != "/":
+            fdir = fdir + "/"
+
 
         try:
             #training
-            if subset == Subset.TRAINING:
-                #unpickle(fdir)
-                print('select subset', 1)
+            if self.subset == Subset.TRAINING:
+                data_holder, labels_holder = [],[]
+                for i in [1,2,3,4]:
+                    batch = unpickle(fdir + f'data_batch_{i}')
+                    d,l = filter_reshape(batch)
+                    data_holder.append(d)
+                    labels_holder.append(l)
+                self.data = np.concatenate(data_holder, 0, dtype="uint8")
+                self.labels = np.concatenate(labels_holder, 0)
+
             #validation
-            elif subset == Subset.VALIDATION:
+            elif self.subset == Subset.VALIDATION:
                 batch_val = unpickle(fdir + 'data_batch_5')
-                self.data = filter_reshape(batch_val)
+                self.data, self.labels = filter_reshape(batch_val)
+
             #test
-            elif subset == Subset.TEST:
+            elif self.subset == Subset.TEST:
                 batch_test = unpickle(fdir + 'test_batch')
-                self.data = filter_reshape(batch_test)
+                self.data, self.labels = filter_reshape(batch_test)
+            else:
+                raise ValueError("Not a valid ")
         except ValueError:
             raise ValueError('fdir is not a Directory or file is missing')
-        #pass
+        
+        self.length = self.data.shape[0]
+        
 
     def __len__(self) -> int:
         '''
         Returns the number of samples in the dataset.
         '''
+        return self.length
 
-        # TODO implement
-
-        pass
 
     def __getitem__(self, idx: int) -> Sample:
         '''
         Returns the idx-th sample in the dataset.
         Raises IndexError if the index is out of bounds. Negative indices are not supported.
         '''
-
-        # TODO implement
-
-        pass
+        if idx < 0 or idx >= self.length:
+            raise IndexError
+        return Sample(idx, self.data[idx], self.labels[idx])
 
     def num_classes(self) -> int:
         '''
         Returns the number of classes.
         '''
-
-        # TODO implement
-
-        pass
+        return len(np.unique(self.labels))
