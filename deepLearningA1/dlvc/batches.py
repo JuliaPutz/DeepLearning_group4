@@ -18,6 +18,7 @@ class Batch:
         self.label = label
         self.idx = idx
 
+
 class BatchGenerator:
     '''
     Batch generator.
@@ -37,6 +38,9 @@ class BatchGenerator:
         Raises TypeError on invalid argument types.
         Raises ValueError on invalid argument values, such as if num is > len(dataset).
         '''
+
+        # TODO:
+        # Type checking / throwing the errors mentioned above
 
         # simple non-operation for when no op argument is passed
         def noOp(sample: np.ndarray) -> np.ndarray:
