@@ -40,13 +40,21 @@ class BatchGenerator:
         '''
 
         # TODO:
-        # Type checking / throwing the errors mentioned above
+        # Which type has op???
 
         # simple non-operation for when no op argument is passed
         def noOp(sample: np.ndarray) -> np.ndarray:
             return sample
 
-
+        # check the argument types and raise TypeError if invalid
+        if not (isinstance(num, int) and 
+                isinstance(dataset, Dataset) and
+                isinstance(shuffle, bool)):
+            raise TypeError('Please check your argument types')
+        # check argument values and raise ValueError if invalid
+        elif (num > len(dataset)):
+            raise ValueError('Num cannot be bigger then the dataset')
+        
         self.dataset = dataset
         self.batch_size = num
         self.shuffle = shuffle
