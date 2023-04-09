@@ -68,9 +68,9 @@ class Accuracy(PerformanceMeasure):
         Resets the internal state.
         '''
 
-        # TODO implement
+        self.acc = 0.0
+        self.comparison = np.array([])
 
-        pass
 
     def update(self, prediction: np.ndarray, target: np.ndarray):
         '''
@@ -80,20 +80,32 @@ class Accuracy(PerformanceMeasure):
         target must have shape (s,) and values between 0 and c-1 (true class labels).
         Raises ValueError if the data shape or values are unsupported.
         '''
+        # TODO: which value for s and c? (hardcode or pass?)
 
-        # TODO implement
+        # check for right shape and values
+        # c ... classes, s ... nr of predictions
+        if (prediction.shape != (s, c) and
+            target.shape != (s, )):
+            raise ValueError('Please check the input shapes')
+        if (np.all((target>=0) & (target <= c - 1))):
+            raise ValueError(f'Values must be between 0 and {c-1}')
 
-        pass
+        # select class label with highest probability per row
+        predicted_class = np.array([r.argmax() for r in prediction])
+
+        # compare prediction with ground-truth
+        # returns boolean array if label is equal or not
+        self.comparison = np.equal(predicted_class, target)
+
 
     def __str__(self):
         '''
         Return a string representation of the performance.
         '''
 
-        # TODO implement
         # return something like "accuracy: 0.395"
-
-        pass
+        return(f'accuracy: {self.acc:.3f}')
+    
 
     def __lt__(self, other) -> bool:
         '''
@@ -103,9 +115,13 @@ class Accuracy(PerformanceMeasure):
 
         # See https://docs.python.org/3/library/operator.html for how these
         # operators are used to compare instances of the Accuracy class
-        # TODO implement
 
-        pass
+        if type(self.acc) != type(other):
+            raise TypeError('types of both measures differ')
+        
+        if self.acc < other:
+            return True
+
 
     def __gt__(self, other) -> bool:
         '''
@@ -113,9 +129,12 @@ class Accuracy(PerformanceMeasure):
         Raises TypeError if the types of both measures differ.
         '''
 
-        # TODO implement
-
-        pass
+        if type(self.acc) != type(other):
+            raise TypeError('types of both measures differ')
+        
+        if self.acc > other:
+            return True
+        
 
     def accuracy(self) -> float:
         '''
@@ -125,5 +144,9 @@ class Accuracy(PerformanceMeasure):
 
         # TODO implement
         # on this basis implementing the other methods is easy (one line)
+        if not self.comparison.any():
+            acc = 0.0
+        else:
+            acc = np.sum(self.comparison) / len(self.comparison)
 
-        pass
+        return acc
