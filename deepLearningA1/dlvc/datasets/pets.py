@@ -59,7 +59,6 @@ class PetsDataset(ClassificationDataset):
             self.subset = Subset(subset)
         else:
             self.subset = subset
-        self.num_classes = 2
         self.data = None
         self.labels = None
 
