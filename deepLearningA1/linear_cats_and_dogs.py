@@ -11,13 +11,21 @@ import torch
 class LinearClassifier(torch.nn.Module):
   def __init__(self, input_dim, num_classes):
     super(LinearClassifier, self).__init__()
-    # TODO: define network layer(s)
-    
+    self.linear1 = torch.nn.Linear(input_dim, num_classes)
 
   def forward(self, x):
-    # TODO: Implement the forward pass.
-    return x
+    tensor = torch.from_numpy(x)
+    out = self.linear1(tensor)
+    return out
 
+# load the data
+print('Load Data ...')
+fdir = r"cifar\\"
+train = PetsDataset(fdir = fdir, subset = Subset.TRAINING)
+test = PetsDataset(fdir = fdir, subset = Subset.TEST)
+validate = PetsDataset(fdir = fdir, subset = Subset.VALIDATION)
+
+print('generate batches ....')
 # TODO: Create a 'BatchGenerator' for training, validation and test datasets.
 op = ops.chain([
     ops.vectorize(),
@@ -25,14 +33,59 @@ op = ops.chain([
     ops.add(-127.5),
     ops.mul(1/127.5),
 ])
+batchtrain = BatchGenerator(train, num = len(train), shuffle=False, op = op)
+batchtest = BatchGenerator(test, num = len(test), shuffle=False, op = op)
+batchval = BatchGenerator(validate, num = len(validate), shuffle=False, op = op)
 
 
 # TODO: Create the LinearClassifier, loss function and optimizer. 
+model = LinearClassifier(32*32*3, train.num_classes())
+criterion = torch.nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters())
 
 
 '''
 TODO: Train a model for multiple epochs, measure the classification accuracy on the validation dataset throughout the training and save the best performing model. 
 After training, measure the classification accuracy of the best perfroming model on the test dataset. Document your findings in the report.
 '''
+print('train classifier ...')
+def train_test_classifier(epochs: int):
+  b_train, = batchtrain
+  b_test, = batchtest
+  b_val, = batchval
+  accuracy = Accuracy()
+  best_acc = Accuracy()
+  best_model = None
 
+  for epoch in range(epochs):
+      
+      # train model
+      output = model(b_train.data)
+      loss = criterion(output, torch.from_numpy(b_train.label))
+      loss.backward()
+      optimizer.step()
+      optimizer.zero_grad()
 
+      # validate model
+      out_val = model(b_val.data)
+      accuracy.update(out_val.detach().numpy(), b_val.label)
+      if accuracy > best_acc:
+        best_acc.update(out_val.detach().numpy(), b_val.label)
+        best_model = model.state_dict()
+
+      print(f'epoch {epoch}')
+      print(f'train loss: {loss.item():.3f}')
+      print(f'val {accuracy}')
+      print('-------------------------------------')
+
+  # load and test best model
+  model.load_state_dict(best_model)
+  out_test = model(b_test.data)
+  accuracy.update(out_test.detach().numpy(), b_test.label)
+
+  print('-------------------------------------')
+  print(f'best val {best_acc}')
+  print(f'test {accuracy}')
+  
+# run for 100 epochs
+train_test_classifier(100)
