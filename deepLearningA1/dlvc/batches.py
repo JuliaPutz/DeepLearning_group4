@@ -39,8 +39,6 @@ class BatchGenerator:
         Raises ValueError on invalid argument values, such as if num is > len(dataset).
         '''
 
-        # TODO:
-        # Which type has op???
 
         # simple non-operation for when no op argument is passed
         def noOp(sample: np.ndarray) -> np.ndarray:
@@ -49,7 +47,8 @@ class BatchGenerator:
         # check the argument types and raise TypeError if invalid
         if not (isinstance(num, int) and 
                 isinstance(dataset, Dataset) and
-                isinstance(shuffle, bool)):
+                isinstance(shuffle, bool) and
+                callable(op)):
             raise TypeError('Please check your argument types')
         # check argument values and raise ValueError if invalid
         elif (num > len(dataset)):
@@ -91,7 +90,7 @@ class BatchGenerator:
                 data[j] = self.op(data_item.data)
                 labels[j] = data_item.label
             
-            return Batch(idx = batch_indices, data = data, label = labels)
+            return Batch(idx = batch_indices, data = data.astype(np.float32), label = labels.astype(np.int64))
 
         i = 0
         while i < len(self.dataset) - self.batch_size:
