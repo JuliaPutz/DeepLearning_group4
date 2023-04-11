@@ -56,6 +56,7 @@ def train_test_classifier(epochs: int):
   accuracy = Accuracy()
   best_acc = Accuracy()
   best_model = None
+  acc_log = np.array(['epoch', 'val accuracy'])
 
   for epoch in range(epochs):
       
@@ -69,11 +70,12 @@ def train_test_classifier(epochs: int):
       # validate model
       out_val = model(b_val.data)
       accuracy.update(out_val.detach().numpy(), b_val.label)
+      acc_log = np.vstack([acc_log, [str(epoch+1), str(accuracy.acc)]])
       if accuracy > best_acc:
         best_acc.update(out_val.detach().numpy(), b_val.label)
         best_model = model.state_dict()
 
-      print(f'epoch {epoch}')
+      print(f'epoch {epoch+1}')
       print(f'train loss: {loss.item():.3f}')
       print(f'val {accuracy}')
       print('-------------------------------------')
@@ -82,10 +84,13 @@ def train_test_classifier(epochs: int):
   model.load_state_dict(best_model)
   out_test = model(b_test.data)
   accuracy.update(out_test.detach().numpy(), b_test.label)
+  acc_log = np.vstack([acc_log, ['final test accuracy', str(accuracy.acc)]])
+
 
   print('-------------------------------------')
   print(f'best val {best_acc}')
   print(f'test {accuracy}')
+  np.savetxt("accuracies.csv", acc_log, delimiter = ",", fmt='%s')
   
 # run for 100 epochs
 train_test_classifier(100)
