@@ -33,7 +33,15 @@ def load_image(fpath: str) -> np.ndarray:
     Raises FileNotFoundError if the file does not exist.
     '''
 
-    # TODO implement
+    # not 100% sure is 2D Function a numpy array?
+    if os.path.exists(fpath):
+        image = cv2.imread(fpath)
+        image_normalized = (image - np.min(image)) / (np.max(image) - np.min(image))
+
+        return image_normalized
+    else:
+        raise FileNotFoundError(f"Path: {fpath} not found")
+    
 
 class Fn:
     '''
