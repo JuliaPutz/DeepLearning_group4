@@ -44,6 +44,8 @@ class BatchGenerator:
         def noOp(sample: np.ndarray) -> np.ndarray:
             return sample
 
+        self.op = op if op is not None else noOp
+
         # check the argument types and raise TypeError if invalid
         if not (isinstance(num, int) and 
                 isinstance(dataset, Dataset) and
@@ -53,11 +55,12 @@ class BatchGenerator:
         # check argument values and raise ValueError if invalid
         elif (num > len(dataset)):
             raise ValueError('Num cannot be bigger then the dataset')
+        elif (num <= 0):
+            raise ValueError('Num must be positive!')
         
         self.dataset = dataset
         self.batch_size = num
         self.shuffle = shuffle
-        self.op = op if op is not None else noOp
         self.batch_data_shape = self.op(self.dataset[0].data).shape
 
         # generate an array of valid indices, assuming dataset indices always 
@@ -85,7 +88,7 @@ class BatchGenerator:
             bsize = len(batch_indices)
             data = np.zeros((bsize, *self.batch_data_shape))
             labels = np.zeros(bsize)
-            for j in range(i_start, i_end):
+            for j in range(0, i_end - i_start):
                 data_item = self.dataset[batch_indices[j]]
                 data[j] = self.op(data_item.data)
                 labels[j] = data_item.label

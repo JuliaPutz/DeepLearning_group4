@@ -1,6 +1,7 @@
 
 from ..dataset import Sample, Subset, ClassificationDataset
 import numpy as np
+import os
 
 class PetsDataset(ClassificationDataset):
     '''
@@ -22,14 +23,6 @@ class PetsDataset(ClassificationDataset):
         and returned as uint8 numpy arrays with shape (32, 32, 3), in BGR channel order.
         '''
 
-        # TODO implement
-        #######################################
-        # check channel order
-        # load train data and stack together
-        # len function
-        # getitem function
-        # num classes
-        #######################################
 
         # See the CIFAR-10 website on how to load the data files
         def unpickle(file):
@@ -37,6 +30,15 @@ class PetsDataset(ClassificationDataset):
             with open(file, 'rb') as fo:
                 dict = pickle.load(fo, encoding='bytes')
             return dict
+
+        # check if the directory is valid
+        if not os.path.isdir(fdir):
+            raise ValueError(f"{fdir} is not a valid directory!")
+        
+        # check if the files are all present
+        for f in [f'data_batch_{i}' for i in range(1,6)] + ['test_batch']:
+            if not os.path.isfile(os.path.join(fdir, f)):
+                raise ValueError(f"The specified directory does not contain the expected file {f}!")
 
         # filter out cat and dog images
         cat_label = 3
@@ -88,7 +90,7 @@ class PetsDataset(ClassificationDataset):
                 batch_test = unpickle(fdir + 'test_batch')
                 self.data, self.labels = filter_reshape(batch_test)
             else:
-                raise ValueError("Not a valid ")
+                raise ValueError("Not a valid subset")
         except ValueError:
             raise ValueError('fdir is not a Directory or file is missing')
         
