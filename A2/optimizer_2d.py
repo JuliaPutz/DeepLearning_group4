@@ -35,8 +35,8 @@ def load_image(fpath: str) -> np.ndarray:
 
     # not 100% sure is 2D Function a numpy array?
     if os.path.exists(fpath):
-        image = cv2.imread(fpath)
-        image_normalized = (image - np.min(image)) / (np.max(image) - np.min(image))
+        image = cv2.imread(fpath, cv2.IMREAD_GRAYSCALE)
+        image_normalized = cv2.normalize(image, None, 0, 1.0, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
         return image_normalized
     else:
@@ -63,8 +63,9 @@ class Fn:
         '''
 
         # TODO implement
+        vis = cv2.cvtColor(self.fn, cv2.COLOR_HSV2BGR)
 
-        pass
+        return vis
 
     def __call__(self, loc: Vec2) -> float:
         '''
@@ -72,11 +73,18 @@ class Fn:
         Raises ValueError if loc is out of bounds.
         '''
 
-        # TODO implement
         # You can simply round and map to integers. If so, make sure not to set eps and learning_rate too low
         # Alternatively, you can implement some form of interpolation (for example bilinear)
+        sx1_rounded = round(loc[0].item())
+        sx2_rounded = round(loc[1].item())
 
-        pass
+        # raise Value error if loc is out of bounds 
+        # values of loc need to be rounded first to be able to check that
+        if sx1_rounded > self.fn.shape[0] or sx2_rounded > self.fn.shape[1]:
+            raise ValueError("loc is out of bounds")
+
+        return self.fn[sx1_rounded, sx2_rounded]
+        
 
     def grad(self, loc: Vec2) -> Vec2:
         '''
