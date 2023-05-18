@@ -62,10 +62,13 @@ def hwc2chw() -> Op:
     '''
     Flip a 3D array with shape HWC to shape CHW.
     '''
-
-    # TODO implement (see np.transpose)
-
-    pass
+    def op(sample: np.ndarray) -> np.ndarray:
+        try:
+            return np.transpose(sample, (2,0,1))
+        except ValueError:
+            print(sample.shape)
+            raise
+    return op
 
 def hflip() -> Op:
     '''
