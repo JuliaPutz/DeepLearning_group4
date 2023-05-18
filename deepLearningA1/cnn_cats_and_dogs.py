@@ -15,7 +15,7 @@ class CNNforCatsAndDogs(nn.Module):
         super(CNNforCatsAndDogs, self).__init__()
 
         self.conv_layers = nn.Sequential(
-            nn.Conv2D(in_channels=3, out_channels=16, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2), # halves size to 16x16
             nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
@@ -46,11 +46,10 @@ validate = PetsDataset(fdir = fdir, subset = Subset.VALIDATION)
 
 # specificy batch operations
 op = ops.chain([
-    ops.vectorize(),
+    ops.hwc2chw(),
     ops.type_cast(np.float32),
     ops.add(-127.5),
     ops.mul(1/127.5),
-    ops.hwc2chw(),
 ])
 
 # make batches
@@ -77,8 +76,8 @@ acc_log = np.array(['epoch', 'val_accuracy'])
 for epoch in range(100):
     train_losses = []
     for b_train in batchtrain:
-        train_loss = clf.train(b_train.data, b_train.labels)
-        train_losses.append(train_loss)
+        train_loss = clf.train(b_train.data, b_train.label)
+        train_losses.append(train_loss.detach().numpy())
     train_losses = np.array(train_losses)
     for b_val in batchval:
         out_val = clf.predict(b_val.data)
@@ -90,7 +89,7 @@ for epoch in range(100):
 
     print(f'epoch {epoch+1}')
     print(f'train loss: {np.mean(train_losses):.3f} ± {np.std(train_losses):.3f}')
-    print(f'val acc: {accuracy:.3f}')
+    print(f'val {accuracy}')
     print('-------------------------------------')
 
 # load best model and test it
@@ -102,6 +101,6 @@ for b_test in batchtest:
 acc_log = np.vstack([acc_log, ['final test accuracy', str(accuracy.acc)]])
 
 print('-------------------------------------')
-print(f'best val acc: {best_acc:.3f}')
-print(f'test acc: {accuracy:.3f}')
+print(f'best val {best_acc}')
+print(f'test {accuracy}')
 np.savetxt("accuracies_cnn.csv", acc_log, delimiter = ",", fmt='%s')

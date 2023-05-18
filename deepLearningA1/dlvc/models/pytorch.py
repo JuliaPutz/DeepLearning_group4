@@ -35,10 +35,10 @@ class CnnClassifier(Model):
         self.num_classes = num_classes
         self.lr = lr
         self.wd = wd
-        self.is_cuda = self.net.parameters().is_cuda
+        self.is_cuda = any([x.is_cuda for x in self.net.parameters()])
 
         self.loss = torch.nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.lr, weigth_decay=self.wd)
+        self.optimizer = torch.optim.SGD(self.net.parameters(), lr=self.lr, weight_decay=self.wd)
 
 
     def input_shape(self) -> tuple:
@@ -75,7 +75,7 @@ class CnnClassifier(Model):
         
         if not data.dtype == np.float32:
             raise TypeError(f"Input data does not have the correct type! Expecting np.float32, got {data.dtype}.") 
-        if not labels.dtype == int:
+        if not (labels.dtype == int or labels.dtype == np.int64):
             raise TypeError(f"Labels do not have the correct type! Expecting int, got {labels.dtype}.")
         
         if data.shape[1:] != self.input_shape:
