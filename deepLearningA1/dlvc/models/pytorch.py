@@ -87,12 +87,22 @@ class CnnClassifier(Model):
         
         try:
             self.net.train()
+            if self.is_cuda:
+                device = torch.device("cuda:0")
+                data = torch.from_numpy(data).to(device)
+                labels = torch.from_numpy(labels).to(device)
+            else:
+                data = torch.from_numpy(data)
+                labels = torch.from_numpy(labels)
             output = self.net(data)
-            loss = self.loss(output, torch.from_numpy(labels))
+            loss = self.loss(output, labels)
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
-            return loss
+            if self.is_cuda:
+                return loss.detach().cpu()
+            else:
+                return loss.detach()
         except:
             raise RuntimeError("Encountered an issue in training.")
 
@@ -122,9 +132,17 @@ class CnnClassifier(Model):
         try:
             softmax_layer = nn.Softmax(dim=1)
             self.net.eval()
+            if self.is_cuda:
+                device = torch.device("cuda:0")
+                data = torch.from_numpy(data).to(device)
+            else:
+                data = torch.from_numpy(data)
             out = self.net(data)
             softmax_scores = softmax_layer(out)
-            return softmax_scores
+            if self.is_cuda:
+                return softmax_scores.detach().cpu()
+            else:
+                return softmax_scores.detach()
         except:
             raise RuntimeError("Encountered an issue in predicting.")
         

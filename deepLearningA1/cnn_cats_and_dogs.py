@@ -30,7 +30,8 @@ class CNNforCatsAndDogs(nn.Module):
         )
 
     def forward(self, x):
-        x = torch.from_numpy(x)
+        if isinstance(x, np.ndarray):
+            x = torch.from_numpy(x)
         x = self.conv_layers(x)
         x = x.view(x.size(0), -1) # flatten tensor
         x = self.linear_layers(x)
@@ -65,26 +66,31 @@ if torch.cuda.is_available():
 else:
     print("Using CPU.")
     model = model.cpu()
-clf = CnnClassifier(model, (3,32,32), 2, 1e-4, 0.2)
+clf = CnnClassifier(model, (3,32,32), 2, 0.02, 0.005)
 
 
 accuracy = Accuracy()
 best_acc = Accuracy()
 best_model = None
 acc_log = np.array(['epoch', 'val_accuracy'])
+min_train_loss = 1
 
 for epoch in range(100):
     train_losses = []
     for b_train in batchtrain:
         train_loss = clf.train(b_train.data, b_train.label)
-        train_losses.append(train_loss.detach().numpy())
+        train_losses.append(train_loss.numpy())
     train_losses = np.array(train_losses)
+    if np.mean(train_losses) < min_train_loss:
+        min_train_loss = np.mean(train_losses)
+
     for b_val in batchval:
         out_val = clf.predict(b_val.data)
-        accuracy.update(out_val.detach().numpy(), b_val.label)
+        accuracy.update(out_val.numpy(), b_val.label)
     acc_log = np.vstack([acc_log, [str(epoch+1), str(accuracy.acc)]])
+
     if accuracy > best_acc:
-        best_acc.update(out_val.detach().numpy(), b_val.label)
+        best_acc.update(out_val.numpy(), b_val.label)
         best_model = clf.net.state_dict()
 
     print(f'epoch {epoch+1}')
@@ -97,10 +103,11 @@ model.load_state_dict(best_model)
 final_clf = CnnClassifier(model, (3,32,32), 2, 1e-4, 0.2)
 for b_test in batchtest:
     out_test = final_clf.predict(b_test.data)
-    accuracy.update(out_test.detach().numpy(), b_test.label)
+    accuracy.update(out_test.numpy(), b_test.label)
 acc_log = np.vstack([acc_log, ['final test accuracy', str(accuracy.acc)]])
 
 print('-------------------------------------')
+print(f'min train loss: {min_train_loss:.3f}')
 print(f'best val {best_acc}')
 print(f'test {accuracy}')
 np.savetxt("accuracies_cnn.csv", acc_log, delimiter = ",", fmt='%s')
