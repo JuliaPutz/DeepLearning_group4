@@ -36,6 +36,8 @@ def load_image(fpath: str) -> np.ndarray:
     # not 100% sure is 2D Function a numpy array?
     if os.path.exists(fpath):
         image = cv2.imread(fpath, cv2.IMREAD_GRAYSCALE)
+        # output dtype needs to be float not int to properly represent image
+        # in range [0, 1]
         image_normalized = cv2.normalize(image, None, 0, 1.0, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
         return image_normalized
@@ -63,7 +65,9 @@ class Fn:
         '''
 
         # TODO implement
-        vis = cv2.cvtColor(self.fn, cv2.COLOR_HSV2BGR)
+        # ?? How does this work with normalized input with dtype CV_32F ??
+        # this might be a workaround, looks right at least
+        vis = cv2.applyColorMap(np.uint8(self.fn * 255), cv2.COLORMAP_BONE)
 
         return vis
 
@@ -83,7 +87,7 @@ class Fn:
         if sx1_rounded > self.fn.shape[0] or sx2_rounded > self.fn.shape[1]:
             raise ValueError("loc is out of bounds")
 
-        return self.fn[sx1_rounded, sx2_rounded]
+        return self.fn[sx2_rounded, sx1_rounded]
         
 
     def grad(self, loc: Vec2) -> Vec2:
@@ -92,9 +96,24 @@ class Fn:
         Raises ValueError if loc is out of bounds of fn or if eps <= 0.
         '''
 
-        # TODO implement
+        # implemented
+        # are errors correct?
+        if loc[0] > self.fn.shape[0] or loc[1] > self.fn.shape[1]:
+            raise ValueError("loc is out of bounds")
+        elif self.eps <= 0:
+            raise ValueError("eps has to be > 0")
+        elif loc[0] + self.eps > self.fn.shape[0] or loc[1] + self.eps > self.fn.shape[1]:
+            raise ValueError("eps + loc is out of bounds")
+        else:
+            position_loc = self(loc)
+            position_plus_x1 = self(Vec2(loc[0] + self.eps, loc[1]))
+            position_plus_x2 = self(Vec2(loc[0], loc[1] + self.eps))
 
-        pass
+            num_gradient_x1 = (position_plus_x1 - position_loc) / self.eps
+            num_gradient_x2 = (position_plus_x2 - position_loc) / self.eps
+
+        return Vec2(num_gradient_x1, num_gradient_x2)
+
 
 if __name__ == '__main__':
     # Parse args
@@ -127,7 +146,19 @@ if __name__ == '__main__':
 
         # This returns the value of the function fn at location loc.
         # Since we are trying to find a minimum of the function this acts as a loss value.
-        # loss = AutogradFn.apply(fn, loc)
+        loss = AutogradFn.apply(fn, loc)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # calculate starting and end point of line representing the gradient
+        start = (round(loc[0].item()), round(loc[1].item()))
+        end = (round(loc.grad[0].item() * 2000) + round(loc[0].item()),  round(loc.grad[1].item() * 2000) + round(loc[1].item()))
+    
+        cv2.line(vis, start, end, [0, 255, 0], 2)
 
         cv2.imshow('Progress', vis)
         cv2.waitKey(50)  # 20 fps, tune according to your liking
+
+        if loc.grad[0].item() == 0. and loc.grad[1].item() == 0.:
+            break
