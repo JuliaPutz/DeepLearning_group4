@@ -74,10 +74,12 @@ def hflip() -> Op:
     '''
     Flip arrays with shape HWC horizontally with a probability of 0.5.
     '''
-
-    # TODO implement (numpy.flip will be helpful)
-
-    pass
+    def op(sample: np.ndarray) -> np.ndarray:
+        if np.random.randint(2): # 50% chance to be 0 and thus False
+            return np.flip(sample, 1)
+        else:
+            return sample
+    return op
 
 def rcrop(sz: int, pad: int, pad_mode: str) -> Op:
     '''
@@ -86,8 +88,25 @@ def rcrop(sz: int, pad: int, pad_mode: str) -> Op:
     How padding is done is governed by pad_mode, which should work exactly as the 'mode' argument of numpy.pad.
     Raises ValueError if sz exceeds the array width/height after padding.
     '''
+    def op(sample: np.ndarray) -> np.ndarray:
+        padding = ((pad,pad),(pad,pad),(0,0)) # pad top/bottom and left/right for first two axes, but not the last (=channels)
+        padded = np.pad(sample, padding, pad_mode)
+        if sz > min(padded.shape[:-1]):
+            raise ValueError("Crop size is larger than padded image size!")
+        tlc = np.random.randint((padded.shape[0]-sz, padded.shape[1]-sz)) # pick top left corner of crop so that at least sz pixels remain
+        return padded[tlc[0]:tlc[0]+sz,tlc[1]:tlc[1]+sz] # crop by slicing from top left corner
+    return op
 
-    # TODO implement
-    # https://numpy.org/doc/stable/reference/generated/numpy.pad.html will be helpful
-
-    pass
+# extra augmentation method
+def rotate(num = None) -> Op:
+    '''
+    Rotate the sample by 90 degrees "num" times. If num is None, a random value is picked for each image.
+    The sample array has shape HWC and will be rotated in the plane of the first two axes. 
+    '''
+    def op(sample: np.ndarray) -> np.ndarray:
+        if num is None:
+            num = np.random.randint(4) # equal chance for 0, 90, 180 and 270 degree rotations
+        elif not isinstance(num, int):
+            raise ValueError("num needs to be an integer or None.")
+        return np.rot90(sample, num, axes=(0,1))
+    return op
