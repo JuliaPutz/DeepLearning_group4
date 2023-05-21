@@ -33,11 +33,11 @@ def load_image(fpath: str) -> np.ndarray:
     Raises FileNotFoundError if the file does not exist.
     '''
 
-    # not 100% sure is 2D Function a numpy array?
     if os.path.exists(fpath):
+        # use IMREAD_GRAYSCALE to get a 2d function
         image = cv2.imread(fpath, cv2.IMREAD_GRAYSCALE)
         # output dtype needs to be float not int to properly represent image
-        # in range [0, 1]
+        # normalize in range [0, 1]
         image_normalized = cv2.normalize(image, None, 0, 1.0, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
         return image_normalized
@@ -64,10 +64,8 @@ class Fn:
         Use the result to visualize the progress of gradient descent.
         '''
 
-        # TODO implement
-        # ?? How does this work with normalized input with dtype CV_32F ??
-        # this might be a workaround, looks right at least
-        vis = cv2.applyColorMap(np.uint8(self.fn * 255), cv2.COLORMAP_BONE)
+        # multiply function with 255 and convert to int to get correct input type
+        vis = cv2.applyColorMap(np.uint8(self.fn * 255), cv2.COLORMAP_RAINBOW)
 
         return vis
 
@@ -79,15 +77,15 @@ class Fn:
 
         # You can simply round and map to integers. If so, make sure not to set eps and learning_rate too low
         # Alternatively, you can implement some form of interpolation (for example bilinear)
-        sx1_rounded = round(loc[0].item())
-        sx2_rounded = round(loc[1].item())
+        sx1_rounded = round(loc[0])
+        sx2_rounded = round(loc[1])
 
         # raise Value error if loc is out of bounds 
         # values of loc need to be rounded first to be able to check that
         if sx1_rounded > self.fn.shape[0] or sx2_rounded > self.fn.shape[1]:
             raise ValueError("loc is out of bounds")
 
-        return self.fn[sx2_rounded, sx1_rounded]
+        return self.fn[sx1_rounded, sx2_rounded]
         
 
     def grad(self, loc: Vec2) -> Vec2:
@@ -96,8 +94,6 @@ class Fn:
         Raises ValueError if loc is out of bounds of fn or if eps <= 0.
         '''
 
-        # implemented
-        # are errors correct?
         if loc[0] > self.fn.shape[0] or loc[1] > self.fn.shape[1]:
             raise ValueError("loc is out of bounds")
         elif self.eps <= 0:
@@ -136,8 +132,12 @@ if __name__ == '__main__':
 
     # PyTorch uses tensors which are very similar to numpy arrays but hold additional values such as gradients
     loc = torch.tensor([args.sx1, args.sx2], requires_grad=True)
-    optimizer = torch.optim.SGD([loc], lr=args.learning_rate, momentum=args.beta, nesterov=args.nesterov)
+    #optimizer = torch.optim.SGD([loc], lr=args.learning_rate, momentum=args.beta, nesterov=args.nesterov)
+    optimizer = torch.optim.Adam([loc], lr = args.learning_rate)
 
+    iteration = 0
+    prev_loc = loc
+    print(f"Starting point: {prev_loc}")
     # Find a minimum in fn using a PyTorch optimizer
     # See https://pytorch.org/docs/stable/optim.html for how to use optimizers
     while True:
@@ -152,13 +152,23 @@ if __name__ == '__main__':
         optimizer.step()
 
         # calculate starting and end point of line representing the gradient
-        start = (round(loc[0].item()), round(loc[1].item()))
-        end = (round(loc.grad[0].item() * 2000) + round(loc[0].item()),  round(loc.grad[1].item() * 2000) + round(loc[1].item()))
+        new_x1 = loc.grad[0].item() + loc[0].item()
+        new_x2 = loc.grad[1].item() + loc[1].item()
+        
+        start = (round(prev_loc[0].item()), round(prev_loc[1].item()))
+        end = (round(new_x1),  round(new_x2))
     
-        cv2.line(vis, start, end, [0, 255, 0], 2)
-
+        cv2.line(vis, start, end, [0, 0, 0], 2)
         cv2.imshow('Progress', vis)
         cv2.waitKey(50)  # 20 fps, tune according to your liking
 
         if loc.grad[0].item() == 0. and loc.grad[1].item() == 0.:
             break
+        elif iteration > 1000:
+            print("reached max iterations")
+            break
+
+        iteration += 1
+        prev_loc = torch.tensor([new_x1, new_x2])
+    
+    print(f"Iterations until stop: {iteration}")
