@@ -1,0 +1,2 @@
+1) try out some image segmentation stuff from huggingface
+2) try to come up with "what to actually do" - evaluating different semseg architectures? onepeace vs mask2former for example?
