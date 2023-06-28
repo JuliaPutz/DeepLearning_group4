@@ -5,6 +5,8 @@ from datasets import load_dataset
 from transformers import AutoImageProcessor, Mask2FormerForUniversalSegmentation
 from torch.utils.data import DataLoader
 from functools import partial
+from tqdm.auto import tqdm
+import evaluate
 
 models = [{"type":"mask2former","trained_on":"ade","purpose":"semantic","variant":"tiny",
            "huggingface_id":"facebook/mask2former-swin-tiny-ade-semantic"}]
@@ -47,6 +49,90 @@ def create_batch(train_ds, test_ds, batch_size, processor):
 
     return train_data_loader, test_data_loader
 
+def print_initial_loss(model, batch):
+    outputs = model(batch["pixel_values"],
+                    class_labels = batch["class_labels"],
+                    mask_labels = batch["mask_labels"])
+    
+    print(f"Initial loss: {outputs.loss}")
+
+def train_model(model, train_data_loader, test_data_loader, processor, device, epochs: int = 2):
+    model.to(device)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=5e-5)
+    metric = evaluate.load("mean_iou")
+    running_loss = 0.0
+    num_samples = 0
+
+    for epoch in range(epochs):
+        print(f'Epoch: {epoch}')
+
+        #train
+        model.train()
+        for idx, batch in enumerate(tqdm(train_data_loader)):
+            optimizer.zero_grad() # reset parameter gradients
+
+            # forward pass
+            outputs  = model(pixel_values = batch["pixel_values"].to(device),
+                             mask_labels = [labels.to(device) for labels in batch["mask_labels"]],
+                             class_labels = [labels.to(device) for labels in batch["class_labels"]])
+            
+            # propagate backwards
+            loss = outputs.loss
+            loss.backward()
+
+            batch_size = batch["pixel_values"].size(0)
+            running_loss += loss.item()
+            num_samples += batch_size
+
+            if idx % 100 == 0:
+                print(f'Loss: {running_loss/num_samples}')
+
+            # optimize
+            optimizer.step()
+        
+        # evaluate
+        model.eval()
+        for idx, batch in enumerate(tqdm(test_data_loader)):
+            if idx > 5:
+                break
+
+            pixel_values = batch["pixel_values"]
+
+            # forward pass
+            with torch.no_grad():
+                outputs = model(pixel_values = pixel_values.to(device))
+
+            # original images
+            original_images = batch["original_images"]
+            target_sizes = [(image.shape[0], image.shape[1]) for image in original_images]
+
+            # compare predict + ground truth segmentation maps
+            predicted_segmentation_maps = processor.post_process_semantic_segmentation(outputs, target_sizes = target_sizes)
+            ground_truth_segmentation_maps = batch["original_segmentation_maps"]
+            metric.add_batch(references = ground_truth_segmentation_maps, predictions = predicted_segmentation_maps)
+
+        print(f"Mean IoU: {metric.compute(num_labels = len(id2label), ignore_index=0)['mean_iou']}")
+    
+    return model
+
+def inference(model, batch):
+    """
+    perform prediction using new model
+    compare overlay for one image of ground truth with new prediction
+    """
+
+    # show new prediction for one image
+    image = batch["original_images"][0]
+    pred = infer_img(processor, model, image)
+    show_overlay(image, pred)
+
+    # ground truth
+    segmentation_map = batch["original_segmentation_maps"][0]
+    show_overlay(image, segmentation_map)
+
+
+
 if __name__ == "__main__":
     # load dataset. Caches, so doesn't have to be repeatedly redownloaded. 
     processor, model = load_model("facebook/mask2former-swin-tiny-ade-semantic")
@@ -55,8 +141,20 @@ if __name__ == "__main__":
     pred = infer_img(processor, model, image)
     show_overlay(image, pred)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # create batches and train + evaluate model
+    train_data_loader, test_data_loader = create_batch(train_ds, test_ds, batch_size=2, processor=processor)
+    batch_train = next(iter(train_data_loader))
+    batch_test = next(iter(test_data_loader))
+
+    print_initial_loss(model, batch_train)
+
+    model = train_model(model, train_data_loader, test_data_loader, processor, device, epochs = 100)
+    inference(model, batch_test)
+
+
 # % TODO 
-# make pytorch batch system for finetuning
 # do fine tuning
 # evaluate models!
 # write report :)
