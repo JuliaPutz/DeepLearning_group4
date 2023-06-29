@@ -143,7 +143,7 @@ def eval_model(model, test_data_loader, processor, device, metric, num_batches =
     return metric
     
 
-def inference(model, batch):
+def inference(model, batch, processor):
     """
     perform prediction using new model
     compare overlay for one image of ground truth with new prediction
