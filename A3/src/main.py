@@ -52,7 +52,7 @@ def make_dataset(name: str):
 
 def get_label_map(repo_id: str):
     """
-    return labels that can possibly be assigned to each pixel
+    return map of class ids to class labels as defined by the named dataset
 
     repo_id: Path or name of the dataset
     """
@@ -204,13 +204,19 @@ def eval_model(model, test_data_loader: DataLoader, processor, device, num_batch
     return metric
     
 def iou(mask1, mask2):
+    '''Calculate the intersection over union for the two binary masks'''
+    # area = number of pixels
     mask1_area = torch.count_nonzero(mask1)
     mask2_area = torch.count_nonzero(mask2)
+    # the intersection is the number of pixels where both masks are True
     intersection = torch.count_nonzero(torch.logical_and(mask1, mask2))
+    # the union is computed as the sum of both areas minus the intersection, which would be counted twice otherwise
     iou = intersection / (mask1_area + mask2_area - intersection)
+    # the .item() method extracts the value from this size-1 tensor
     return iou.item()
 
 def get_ious(pred, truth):
+    '''From a semantic segmentation prediction and a ground truth, compute the iou for each class (=unique value) and compute the average'''
     uniques = truth.unique()
     ious = {}
     for i in uniques:
@@ -254,7 +260,7 @@ def inference(model, test_dataloader, processor):
 
     model: model used to predict segmentation
     test_dataloader: data to take example image from
-    processor: used to predict segmentation
+    processor: used to convert images into model input and model output back into images
     """
     batch = next(iter(test_dataloader))
 
@@ -297,12 +303,12 @@ if __name__ == "__main__":
     print(f"Pre-Finetuning Mean IoU: {metric.compute(num_labels = len(id2label), ignore_index=0)['mean_iou']}")
 
     # tuning! ~5 minutes per epoch...
-    n_epochs = 20
+    n_epochs = 2
     finetuned_model = train_model(model, train_dataloader, device, epochs = n_epochs)
     finetuned_model.save_pretrained(f"mask2former_finetuned_{name.replace('/','-')}_{n_epochs}epochs")
 
     # evaluation of finetuned model!
-    metric = eval_model(finetuned_model, test_dataloader, processor, device)
+    metric = eval_model(finetuned_model, test_dataloader, processor, device, num_batches=5)
     metric_custom = eval_model2(finetuned_model, test_dataloader)
     print(f"Post-Finetuning Mean IoU: {metric.compute(num_labels = len(id2label), ignore_index=0)['mean_iou']}")
     print(f'Post-Finetuning custom Mean IoU: {metric_custom["mean"].mean()}')
