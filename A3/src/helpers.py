@@ -13,17 +13,16 @@ ADE_MEAN = np.array([123.675, 116.280, 103.530]) / 255
 ADE_STD = np.array([58.395, 57.120, 57.375]) / 255
 
 # define image transforms for training
-# todo: describe what each step does
 train_transform = A.Compose([
-    A.LongestMaxSize(max_size=1333),    
-    A.RandomCrop(width=512, height=512),
-    A.HorizontalFlip(p=0.5),
-    #A.Normalize(mean=ADE_MEAN, std=ADE_STD),
+    A.LongestMaxSize(max_size=1333),        # rescales the image so it's longest size is as defined, keepin the aspect ratio
+    A.RandomCrop(width=512, height=512),    # crop the image to the specified size, returning a random portion of the image 
+    A.HorizontalFlip(p=0.5),                # 50% chance to flip the image horizontally
+    #A.Normalize(mean=ADE_MEAN, std=ADE_STD),   # normalization was not performed
 ])
 
 # define image transforms for testing
 test_transform = A.Compose([
-    A.Resize(width=512, height=512),
+    A.Resize(width=512, height=512),        # resizes the image to the specified size (=model expecation) for inference
     #A.Normalize(mean=ADE_MEAN, std=ADE_STD),
 ])
 
