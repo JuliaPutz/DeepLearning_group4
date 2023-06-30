@@ -69,7 +69,7 @@ def print_initial_loss(model, batch):
     print(f"Initial loss: {outputs.loss}")
     return outputs
 
-def train_model(model, train_data_loader, test_data_loader, processor, device, epochs: int = 2):
+def train_model(model, train_data_loader, device, epochs: int = 2):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-5)
     running_loss = 0.0
@@ -194,8 +194,3 @@ if __name__ == "__main__":
     # evaluation of finetuned model!
     metric = eval_model(finetuned_model, test_dataloader, processor, device, metric)
     print(f"Post-Finetuning Mean IoU: {metric.compute(num_labels = len(id2label), ignore_index=0)['mean_iou']}")
-
-# % TODO 
-# do fine tuning
-# evaluate models!
-# write report :)
