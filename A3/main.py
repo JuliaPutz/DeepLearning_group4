@@ -12,8 +12,14 @@ import time
 models = [{"type":"mask2former","trained_on":"ade","purpose":"semantic","variant":"tiny",
            "huggingface_id":"facebook/mask2former-swin-tiny-ade-semantic"}]
 
-def load_model(name, id2label=None, modelType = Mask2FormerForUniversalSegmentation):
-    # load the specified model from huggingface
+def load_model(name: str, id2label = None, modelType = Mask2FormerForUniversalSegmentation):
+    """
+    load the specified model from huggingface
+
+    name: Path or name of the model
+    id2label: dict representing available label and its ids
+    modelType: used for defining the model
+    """
     processor = AutoImageProcessor.from_pretrained(name)
     if id2label is None:
         # default model
@@ -23,7 +29,13 @@ def load_model(name, id2label=None, modelType = Mask2FormerForUniversalSegmentat
         model = modelType.from_pretrained(name, id2label = id2label, ignore_mismatched_sizes=True)
     return processor, model
 
-def make_dataset(name):
+def make_dataset(name: str):
+    """
+    split dataset into train and test
+    and return them as ImageSegmentationDataset
+
+    name: Path or name of the dataset
+    """
     dataset = load_dataset(name)
     dataset = dataset.shuffle(seed=1)
     dataset = dataset["train"].train_test_split(test_size=0.2)
@@ -34,13 +46,21 @@ def make_dataset(name):
     test_dataset = ImageSegmentationDataset(test_ds, transform=test_transform)
     return train_dataset, test_dataset
 
-def get_label_map(repo_id):
+def get_label_map(repo_id: str):
+    """
+    return labels that can possibly be assigned to each pixel
+
+    repo_id: Path or name of the dataset
+    """
     filename = "id2label.json"
     id2label = json.load(open(hf_hub_download(repo_id, filename, repo_type="dataset"), "r"))
     id2label = {int(k):v for k,v in id2label.items()}
     return id2label
 
 def collate_fn_custom(batch, processor):
+    """
+    bring batches into a format the model expects
+    """
     inputs = list(zip(*batch))
     images = inputs[0]
     segmentation_maps = inputs[1]
@@ -55,13 +75,26 @@ def collate_fn_custom(batch, processor):
 
     return batch
 
-def create_batch(train_ds, test_ds, batch_size, processor):
+def create_batch(train_ds: ImageSegmentationDataset, test_ds: ImageSegmentationDataset, batch_size: int, processor):
+    """
+    create batches for train and test set using DataLoader
+
+    train_ds: dataset from which to load the data for training
+    test_ds: dataset from which to load the data for training
+    batch_size: how many samples per batch to load
+    processor: processor to use for bringing data into the format the model expects
+    """
     train_data_loader = DataLoader(train_ds, batch_size = batch_size, shuffle=True, collate_fn=partial(collate_fn_custom, processor = processor))
     test_data_loader = DataLoader(test_ds, batch_size = batch_size, shuffle=False, collate_fn=partial(collate_fn_custom, processor = processor))
 
     return train_data_loader, test_data_loader
 
 def print_initial_loss(model, batch):
+    """
+    prints loss of initial pre-trained model
+
+    model: model to compute loss for
+    """
     outputs = model(batch["pixel_values"],
                     class_labels = batch["class_labels"],
                     mask_labels = batch["mask_labels"])
@@ -69,8 +102,15 @@ def print_initial_loss(model, batch):
     print(f"Initial loss: {outputs.loss}")
     return outputs
 
-def train_model(model, train_data_loader, device, epochs: int = 2):
+def train_model(model, train_data_loader: DataLoader, device, epochs: int = 2):
+    """
+    returns the model trained for specified number of epochs
 
+    model: model to fine-tune
+    train_data_loader: data to use for training
+    device: defines whether to use cuda or cpu
+    epochs: how many epochs to train
+    """
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-5)
     running_loss = 0.0
     num_samples = 0
@@ -103,7 +143,18 @@ def train_model(model, train_data_loader, device, epochs: int = 2):
             optimizer.step()
     return model
 
-def eval_model(model, test_data_loader, processor, device, metric, num_batches = 0, show_times=False):
+def eval_model(model, test_data_loader: DataLoader, processor, device, num_batches: int = 0, show_times: bool = False):
+    """
+    returns the mean_iou of the passed model
+
+    model: model to evaluate
+    test_data_loader: data to use for evaluating the model
+    processor: used to perform semantic segmentation
+    device: defines whether to use cuda or cpu
+    num_batches: number of batches to use for evaluation; 0 if all batches should be used
+    show_times: if True print information about time needed for seperate steps
+    """
+
     # evaluate
     start_time = time.time()
     metric = evaluate.load("mean_iou")
@@ -147,6 +198,10 @@ def inference(model, batch, processor):
     """
     perform prediction using new model
     compare overlay for one image of ground truth with new prediction
+
+    model: model used to predict segmentation
+    batch: data to take example image from
+    processor: used to predict segmentation
     """
 
     # show new prediction for one image
@@ -183,14 +238,14 @@ if __name__ == "__main__":
     train_dataloader, test_dataloader = create_batch(train_ds, test_ds, 2, processor)
 
     # checking initial performance...
-    metric = eval_model(model, test_dataloader, processor, device, metric, num_batches=5)
+    metric = eval_model(model, test_dataloader, processor, device, num_batches=5)
     print(f"Pre-Finetuning Mean IoU: {metric.compute(num_labels = len(id2label), ignore_index=0)['mean_iou']}")
 
     # tuning! ~5 minutes per epoch...
     n_epochs = 20
-    finetuned_model = train_model(model, train_dataloader, test_dataloader, processor, device, epochs = n_epochs)
+    finetuned_model = train_model(model, train_dataloader, device, epochs = n_epochs)
     finetuned_model.save_pretrained(f"mask2former_finetuned_{name.replace('/','-')}_{n_epochs}epochs")
 
     # evaluation of finetuned model!
-    metric = eval_model(finetuned_model, test_dataloader, processor, device, metric)
+    metric = eval_model(finetuned_model, test_dataloader, processor, device)
     print(f"Post-Finetuning Mean IoU: {metric.compute(num_labels = len(id2label), ignore_index=0)['mean_iou']}")
