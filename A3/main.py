@@ -8,6 +8,7 @@ from functools import partial
 from tqdm.auto import tqdm
 import evaluate
 import time
+import pandas as pd
 
 models = [{"type":"mask2former","trained_on":"ade","purpose":"semantic","variant":"tiny",
            "huggingface_id":"facebook/mask2former-swin-tiny-ade-semantic"}]
@@ -28,6 +29,9 @@ def load_model(name: str, id2label = None, modelType = Mask2FormerForUniversalSe
         # replace classification head
         model = modelType.from_pretrained(name, id2label = id2label, ignore_mismatched_sizes=True)
     return processor, model
+
+
+##### DATASET #####
 
 def make_dataset(name: str):
     """
@@ -102,6 +106,9 @@ def print_initial_loss(model, batch):
     print(f"Initial loss: {outputs.loss}")
     return outputs
 
+
+##### TRAINING #####
+
 def train_model(model, train_data_loader: DataLoader, device, epochs: int = 2):
     """
     returns the model trained for specified number of epochs
@@ -142,6 +149,9 @@ def train_model(model, train_data_loader: DataLoader, device, epochs: int = 2):
             # optimize
             optimizer.step()
     return model
+
+
+##### EVALUATION #####
 
 def eval_model(model, test_data_loader: DataLoader, processor, device, num_batches: int = 0, show_times: bool = False):
     """
@@ -193,16 +203,60 @@ def eval_model(model, test_data_loader: DataLoader, processor, device, num_batch
 
     return metric
     
+def iou(mask1, mask2):
+    mask1_area = torch.count_nonzero(mask1)
+    mask2_area = torch.count_nonzero(mask2)
+    intersection = torch.count_nonzero(torch.logical_and(mask1, mask2))
+    iou = intersection / (mask1_area + mask2_area - intersection)
+    return iou.item()
 
-def inference(model, batch, processor):
+def get_ious(pred, truth):
+    uniques = truth.unique()
+    ious = {}
+    for i in uniques:
+        ious[i.item()] = iou(pred == i, truth == i)
+    ious["mean"] = np.mean(list(ious.values()))
+    return ious
+
+def eval_model2(modelName, eval_dataloader, modelType = Mask2FormerForUniversalSegmentation):
+    """
+    custom evaluation method computing mean_iou
+
+    modelName: model to evaluate
+    eval_dataloader: data used to evaluate model
+    """
+    if isinstance(modelName, str):
+        model = modelType.from_pretrained(modelName).to(device)
+    else:
+        model = modelName
+    resultlist = []
+    for x in tqdm(eval_dataloader):
+        img = x["pixel_values"]
+        with torch.no_grad():
+            output = model(img.to(device))
+
+        original_image = x["original_images"][0]
+        target_size = (original_image.shape[0], original_image.shape[1])
+        pred = processor.post_process_semantic_segmentation(output, target_sizes = [target_size])[0]
+        truth = x["original_segmentation_maps"][0]
+        ious = get_ious(pred, torch.tensor(truth).to(device))
+        resultlist.append(ious)
+    ioudf = pd.DataFrame(resultlist)
+    ioudf = pd.concat([ioudf["mean"], ioudf.drop("mean", axis=1).sort_index(axis=1)], axis=1)
+    ioudf = ioudf.rename(columns=id2label)
+    return ioudf
+
+
+def inference(model, test_dataloader, processor):
     """
     perform prediction using new model
     compare overlay for one image of ground truth with new prediction
 
     model: model used to predict segmentation
-    batch: data to take example image from
+    test_dataloader: data to take example image from
     processor: used to predict segmentation
     """
+    batch = next(iter(test_dataloader))
 
     # show new prediction for one image
     image = batch["original_images"][0]
@@ -212,6 +266,7 @@ def inference(model, batch, processor):
     # ground truth
     segmentation_map = batch["original_segmentation_maps"][0]
     show_overlay(image, segmentation_map)
+
 
 
 
@@ -248,4 +303,6 @@ if __name__ == "__main__":
 
     # evaluation of finetuned model!
     metric = eval_model(finetuned_model, test_dataloader, processor, device)
+    metric_custom = eval_model2(finetuned_model, test_dataloader)
     print(f"Post-Finetuning Mean IoU: {metric.compute(num_labels = len(id2label), ignore_index=0)['mean_iou']}")
+    print(f'Post-Finetuning custom Mean IoU: {metric_custom["mean"].mean()}')
