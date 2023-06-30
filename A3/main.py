@@ -216,7 +216,7 @@ def inference(model, batch, processor):
 
 
 if __name__ == "__main__":
-    # load dataset. Caches, so doesn't have to be repeatedly redownloaded. 
+    # use cuda if it is available (recommended)
     if torch.cuda.is_available():
         print("using cuda!")
         device = "cuda:0"
